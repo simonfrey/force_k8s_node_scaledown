@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/alecthomas/kong"
+	"k8s.io/client-go/rest"
 	"log"
 	"net/http"
 	"os"
@@ -37,12 +39,15 @@ func main() {
 
 	//
 	// Setup Kubernetes API client
-
-	// Load the kubeconfig file to configure access to the cluster
-	config, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
-	if err != nil {
-		log.Fatalf("Error building kubeconfig: %v", err)
+	config, err := rest.InClusterConfig()
+	if errors.Is(err, rest.ErrNotInCluster) {
+		// Load the kubeconfig file to configure access to the cluster
+		config, err = clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
 	}
+	if err != nil {
+		log.Fatalf("Error building Kubernetes client config: %v", err)
+	}
+
 	// Create a clientset to interact with the Kubernetes API
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
