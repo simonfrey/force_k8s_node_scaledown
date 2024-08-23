@@ -2,6 +2,8 @@
 
 Tool that runs in a loop, checks nodes for relevant pods and deletes the node if no relevant pod is running.
 
+**Use at your own risk! This tool has severe potential of just nuking your cluster if it misbehaves. You have been warned!**
+
 ## Why?
 Especially GPU nodes, tend to never scale down in GKE, which becomes QUITE expensive for not bringing any value. 
 This tool checks if any relevant pod is (still) running on a node and deletes the node if not. 
