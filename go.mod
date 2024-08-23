@@ -5,6 +5,7 @@ go 1.22.0
 toolchain go1.22.5
 
 require (
+	github.com/alecthomas/kong v0.9.0
 	k8s.io/apimachinery v0.31.0
 	k8s.io/client-go v0.31.0
 )
