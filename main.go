@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/alecthomas/kong"
 	"log"
 	"net/http"
 	"os"
@@ -17,16 +18,20 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+var cli struct {
+	IgnoreNamespaces []string      `kong:"default='gke-managed-cim,gmp-system,kube-system',env='IGNORE_NAMESPACES',help='If a pod is running in any of these namespaces, the pod will be ignored and the node deleted'"`
+	MinNodeAge       time.Duration `kong:"default='5m',required,env='MIN_NODE_AGE',help='If nodes are younger than this, they will be ignored and not deleted'"`
+	Sleep            time.Duration `kong:"default='20s',required,env='SLEEP',help='Time to sleep between checks'"`
+	AllowedIdleTime  time.Duration `kong:"default='3m',required,env='ALLOWED_IDLE_TIME',help='Time a node is allowed to be idle before it is deleted'"`
+	HealthcheckPort  string        `kong:"default='9200',env='HEALTHCHECK_PORT',help='Port to listen on for health checks'"`
+}
+
 func main() {
-	ignoreNamespaces := []string{"gke-managed-cim", "gmp-system", "kube-system"}
-	minNodeAge := 5 * time.Minute
-	port := "9200"
-	sleep := 20 * time.Second
-	allowedIdleTime := 3 * time.Minute
+	kong.Parse(&cli)
 
 	// Create a map of namespaces to ignore
 	ignoreNamespaceMap := make(map[string]bool)
-	for _, namespace := range ignoreNamespaces {
+	for _, namespace := range cli.IgnoreNamespaces {
 		ignoreNamespaceMap[namespace] = true
 	}
 
@@ -51,7 +56,7 @@ func main() {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("ok"))
 		})
-		_ = http.ListenAndServe(":"+port, nil)
+		_ = http.ListenAndServe(":"+cli.HealthcheckPort, nil)
 	}()
 
 	//
@@ -86,8 +91,8 @@ func main() {
 		for _, node := range nodes.Items {
 			fmt.Printf("\nNode Name: %s\n", node.Name)
 			nodeAge := time.Since(node.CreationTimestamp.Time)
-			if nodeAge < minNodeAge {
-				fmt.Printf("  Node is less than %v old. Skipping\n", minNodeAge)
+			if nodeAge < cli.MinNodeAge {
+				fmt.Printf("  Node is less than %v old. Skipping\n", cli.MinNodeAge)
 				continue
 			}
 
@@ -131,7 +136,7 @@ func main() {
 				fmt.Printf("  Node is in allowed-idle state. Added to idle list\n")
 				continue
 			}
-			if time.Now().Add(-allowedIdleTime).Before(lastActiveTime) {
+			if time.Now().Add(-cli.AllowedIdleTime).Before(lastActiveTime) {
 				fmt.Printf("  Node is in allowed-idle state. Last active %s ago.\n", time.Now().Sub(lastActiveTime))
 				continue
 			}
@@ -145,6 +150,6 @@ func main() {
 			fmt.Printf("  Node %s removed\n", node.Name)
 		}
 
-		time.Sleep(sleep)
+		time.Sleep(cli.Sleep)
 	}
 }
