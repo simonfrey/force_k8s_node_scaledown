@@ -22,6 +22,7 @@ func main() {
 	minNodeAge := 5 * time.Minute
 	port := "9200"
 	sleep := 20 * time.Second
+	allowedIdleTime := 3 * time.Minute
 
 	// Create a map of namespaces to ignore
 	ignoreNamespaceMap := make(map[string]bool)
@@ -71,6 +72,7 @@ func main() {
 		run.Store(false)
 	}()
 
+	idleNodes := make(map[string]time.Time)
 	for run.Load() {
 		// Get a list of all nodes in the cluster
 		nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
@@ -115,11 +117,26 @@ func main() {
 			}
 
 			if runningPodCount > 0 {
+				// Remove from idle list
+				delete(idleNodes, node.Name)
 				fmt.Printf("  Total Pods Running on Node: %d. Node is still required\n", runningPodCount)
 				continue
 			}
 
-			fmt.Printf("  No Pods Running on Node. Node is not required anymore. Remove it.\n")
+			// No pods are running on the node. Check if the node is idle
+			lastActiveTime, ok := idleNodes[node.Name]
+			if !ok {
+				// Node is not in the idle list. Add it
+				idleNodes[node.Name] = time.Now()
+				fmt.Printf("  Node is in allowed-idle state. Added to idle list\n")
+				continue
+			}
+			if time.Now().Add(-allowedIdleTime).Before(lastActiveTime) {
+				fmt.Printf("  Node is in allowed-idle state. Last active %s ago.\n", time.Now().Sub(lastActiveTime))
+				continue
+			}
+
+			fmt.Printf("  No Pods Running on Node. Node is not required anymore. Allowed-idle time is up.\n  Remove it.\n")
 			// Remove node
 			err = clientset.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})
 			if err != nil {
