@@ -15,7 +15,7 @@ In order to do this. Apply the deployment.yml from the repository to your cluste
 **Keep in mind: If you don't taint your nodes, the tool itself might run on a GPU node, which will prevent scaling down/deleting the node.**
 
 ```bash
-kubectl apply -f deployment.yml
+kubectl apply -f ./k8s
 ```
 ## Contributing
 If you want to contribute, feel free to open a PR or report an issue. 

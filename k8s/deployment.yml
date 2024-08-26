@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: force-node-downscaling
+  name: force-node-downscaling
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: force-node-downscaling
+  template:
+    metadata:
+      labels:
+        app: force-node-downscaling
+    spec:
+      containers:
+        - env:
+            - name: IGNORE_NAMESPACES
+              value: "kube-system,kube-public,kube-node-lease,gke-managed-cim,gmp-system"
+            - name: MIN_NODE_AGE
+              value: "5m"
+            - name: SLEEP
+              value: "10s"
+            - name: ALLOWED_IDLE_TIME
+              value: "3m"
+            - name: HEALTHCHECK_PORT
+              value: "8000"
+          image: ghcr.io/simonfrey/force_k8s_node_scaledown:0.5
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+              scheme: HTTP
+          name: force-node-downscaling
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+              scheme: HTTP
+          resources:
+            limits:
+              cpu: "100m"
+              memory: 200Mi
+            requests:
+              cpu: "100m"
+              memory: 200Mi
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      serviceAccount: force-node-downscaling
+      terminationGracePeriodSeconds: 30
